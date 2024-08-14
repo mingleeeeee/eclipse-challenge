@@ -6,3 +6,4 @@
 3. `npm run build` <br>
 4. `npm start` <br>
 
+![GenImage](public/image/gen_img.png)
