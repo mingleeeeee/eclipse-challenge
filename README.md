@@ -1,5 +1,4 @@
-# GenAI-StoryProtocol
-nodeJS + typescript + openAI + NFT + storyprotocol
+# Total Eclipse Challenge
 
 ### setup
 1. `npm install` <br>
