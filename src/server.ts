@@ -13,18 +13,15 @@ import { Address, http,ContractFunctionExecutionError} from 'viem'
 import { S3 } from 'aws-sdk';
 import { Account, privateKeyToAccount} from 'viem/accounts';
 import { ethers } from 'ethers';
-import MemeNFT from '../artifacts/contracts/MemeNFT.sol/MemeNFT.json';
+import MemeNFT from '../artifacts/contracts/Meme.sol/Meme.json';
 
 const app = express();
 const port = 5000;
 const openai = new OpenAI({apiKey: config.OPENAI_API_KEY});
-const NFTContractAddress='0x7ee32b8B515dEE0Ba2F25f612A04a731eEc24F49'
-const OwnerAddress='0x76C787d210F5876FD124D5b9c156482a74eb00B5'
-const NonCommercialSocialRemixingTermsId=2
-const RPCProviderUrl ='https://ethereum-sepolia-rpc.publicnode.com'
+const RPCProviderUrl ='https://devnet.neonevm.org'
 const provider = new ethers.providers.JsonRpcProvider(RPCProviderUrl);
-
-let accountAddress: Address | null = null; // Global variable to store the account address
+const contractAddress = '0x4B72dc1Ca2Aa8D36e2022Ea4Ded348B818D8c664'; // The deployed contract address
+const memeContract = new ethers.Contract(contractAddress, MemeNFT.abi, provider);
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
@@ -34,7 +31,12 @@ app.use(session({ secret: 'thisisasecret', resave: false, saveUninitialized: tru
 app.get('/', (req: Request, res: Response) => {
     res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
+// Route to serve the publish page
+app.get('/publish', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public', 'publish.html'));
+});
 
+// Save image with BigNumber filename
 app.post('/saveImage', (req: Request, res: Response) => {
   try {
     const { image } = req.body;
@@ -46,8 +48,11 @@ app.post('/saveImage', (req: Request, res: Response) => {
     const base64Data = image.replace(/^data:image\/png;base64,/, '');
     const imageData = Buffer.from(base64Data, 'base64');
 
-    const timestamp = new Date().toISOString().replace(/[-:.]/g, '');
-    const filename = `public/mask/masked_image_${timestamp}.png`;
+    // Generate a BigNumber as the filename
+    const bigNumberFilename = ethers.BigNumber.from(ethers.utils.randomBytes(32)).toString();
+    // Use the BigNumber as the filename
+    console.log(bigNumberFilename)
+    const filename = `public/mask/masked_image_${bigNumberFilename}.png`;
     const savePath = filename;
 
     fs.writeFile(savePath, imageData, (err) => {
@@ -92,8 +97,9 @@ app.post('/recreateImage', async (req: Request, res: Response) => {
       throw new Error('Failed to get the image URL from the response.');
     }
 
-    const timestamp = new Date().toISOString().replace(/[-:.]/g, '');
-    const gen_image_filename = `gen_${timestamp}.png`;
+    // Generate a BigNumber as the filename
+    const bigNumberFilename = ethers.BigNumber.from(ethers.utils.randomBytes(32)).toString();
+    const gen_image_filename = `${bigNumberFilename}.png`;
     const gen_image_path = `public/asset/${gen_image_filename}`;
 
     const imageResponse = await axios.get(image_url, { responseType: 'arraybuffer' });
@@ -149,30 +155,42 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-//mintNFT
+//mint NFT
 app.post('/mintNFT', async (req: Request, res: Response) => {
   try {
-    const { tokenURI, userAddress } = req.body;  // Extract tokenURI and userAddress from the request body
+    const { userAddress, customUri } = req.body;
+    
+    // if (!userAddress || !customUri) {
+    //   return res.status(400).json({ error: 'User address or custom URI is missing.' });
+    // }
 
-    if (!userAddress || !tokenURI) {
-      return res.status(400).json({ error: 'User address or tokenURI is missing.' });
-    }
-
-    // Contract interaction setup
+    // Initialize the contract without a signer
     const provider = new ethers.providers.JsonRpcProvider(RPCProviderUrl);
-    const signer = provider.getSigner(userAddress); // Get the user's wallet as the signer
-    const contract = new ethers.Contract(NFTContractAddress, MemeNFT.abi, signer); // Create a contract instance with the signer
+    const contract = new ethers.Contract(contractAddress, MemeNFT.abi, provider);
 
-    const tx = await contract.mint(tokenURI, userAddress); // Call the mint function on the contract
-    await tx.wait(); // Wait for the transaction to be mined
+    // Encode the transaction data
+    const txData = contract.interface.encodeFunctionData('mintNFT', [userAddress, customUri]);
 
-    res.json({ message: 'NFT minted successfully', transactionHash: tx.hash });
+    // Estimate the gas cost for the transaction
+    const gasEstimate = await contract.estimateGas.mintNFT(userAddress, customUri);
 
+    // Prepare the transaction data to be sent to the client
+    const tx = {
+      to: contractAddress,
+      from: userAddress,
+      data: txData,
+      gasLimit: ethers.utils.hexlify(gasEstimate),
+      // Optionally, you can add more fields like gasPrice
+    };
+
+    // Send the transaction data to the client
+    res.status(200).json(tx);
   } catch (error) {
-    console.error('Error minting NFT:', error);
+    //console.log('Error preparing transaction:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
 
 
 

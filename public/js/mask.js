@@ -5,6 +5,7 @@ let circleRadius = 50; // Initial radius of the circle (can be adjusted)
 let centerX, centerY;
 let isDrawing = false;
 let dotInterval; // Interval variable for printing dots
+let s3ImageName = ""; // Global variable to store the S3 URL
 
 // Function to set canvas size to match image dimensions
 function setCanvasSize() {
@@ -158,6 +159,8 @@ async function generateImage() {
 
             // Update the sourceImage src attribute with the new image URL
             sourceImage.src = responseData.gen_image_url;
+            s3ImageName=responseData.gen_image_filename.replace(/\.png$/, '');
+            console.log("s3 Image:", s3ImageName)
             // Display the generated image URL
             //displayImageUrl(`https://eclipse-challenge.s3.ap-northeast-1.amazonaws.com/${responseData.gen_image_filename}`); 
             showmintButton()
@@ -181,6 +184,7 @@ async function generateImage() {
         const generateButton = document.getElementById('generateButton');
         generateButton.disabled = false;
         generateButton.textContent = 'Generate';
+        generateButton.className='enabled'
     }
 }
 // Function to display image URL
@@ -203,3 +207,81 @@ function showmintButton() {
     mintButton.disabled = false;
     mintButton.classList.add('enabled'); // Add the enabled class for visual feedback
 }
+
+ // Reload button logic
+ document.getElementById('reloadButton').addEventListener('click', () => {
+    location.reload()
+});
+
+async function mintNFT(s3ImageName) {
+    if (!account) {
+        alert("Please connect your wallet first.");
+        return;
+    }
+  
+    // if (!s3ImageName) {
+    //     alert("Please generate an image first.");
+    //     return;
+    // }
+     
+
+    try {
+        // Fetch transaction data from the server
+        const response = await fetch('/mintNFT', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userAddress: account, customUri: s3ImageName }) // Use the imageName to generate the tokenURI
+        });
+  
+        const txData = await response.json();
+  
+        // if (!response.ok) {
+        //     alert(`Error preparing transaction: ${txData.error}`);
+        //     return;
+        // }
+  
+        // Prepare the transaction for MetaMask
+        const transactionParameters = {
+            to: txData.to, // The contract address
+            from: txData.from, // The connected wallet address
+            data: txData.data, // The transaction data returned from the backend
+            gas: txData.gasLimit, // The gas limit returned from the backend
+        };
+  
+        // Request MetaMask to send the transaction
+        const txHash = await ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [transactionParameters],
+        });
+  
+        console.log(`Transaction sent with hash: ${txHash}`);
+        alert(`Transaction sent! Hash: ${txHash}`);
+        mintButton.textContent = 'Mint your NFT :D';  // Reset button
+    } catch (error) {
+        alert(`Transaction Canceled`)
+        //console.error("Error sending transaction:", error);
+        //alert("Failed to send transaction. See console for details.");
+    } finally{
+        const mintButton = document.getElementById('mintButton');
+        mintButton.disabled = false;
+        mintButton.textContent = 'Mint your NFT :D';
+        mintButton.className='enabled'
+    }
+  }
+  
+  // Bind the mint button to the mintNFT function
+  mintButton.addEventListener("click", function() {
+    // Assuming s3ImageName is the name of the image generated and stored in S3
+    mintNFT(s3ImageName);
+    // Re-enable the Generate button and change button text back to 'Generate'
+    if(account){
+        const mintButton = document.getElementById('mintButton');
+        mintButton.disabled = true;
+        mintButton.textContent = 'Waiting for transaction...';
+        mintButton.className='disabled';
+    }
+    
+  });
+  

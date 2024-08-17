@@ -24,15 +24,14 @@ const canvas_1 = require("canvas");
 const config_1 = __importDefault(require("./config"));
 const aws_sdk_1 = require("aws-sdk");
 const ethers_1 = require("ethers");
-const MemeNFT_json_1 = __importDefault(require("../artifacts/contracts/MemeNFT.sol/MemeNFT.json"));
+const Meme_json_1 = __importDefault(require("../artifacts/contracts/Meme.sol/Meme.json"));
 const app = (0, express_1.default)();
 const port = 5000;
 const openai = new openai_1.default({ apiKey: config_1.default.OPENAI_API_KEY });
-const NFTContractAddress = '0x7ee32b8B515dEE0Ba2F25f612A04a731eEc24F49';
-const OwnerAddress = '0x76C787d210F5876FD124D5b9c156482a74eb00B5';
-const NonCommercialSocialRemixingTermsId = 2;
-const RPCProviderUrl = 'https://ethereum-sepolia-rpc.publicnode.com';
+const RPCProviderUrl = 'https://devnet.neonevm.org';
 const provider = new ethers_1.ethers.providers.JsonRpcProvider(RPCProviderUrl);
+const contractAddress = '0x4B72dc1Ca2Aa8D36e2022Ea4Ded348B818D8c664'; // The deployed contract address
+const memeContract = new ethers_1.ethers.Contract(contractAddress, Meme_json_1.default.abi, provider);
 let accountAddress = null; // Global variable to store the account address
 app.use((0, cors_1.default)());
 app.use(body_parser_1.default.json({ limit: '10mb' }));
@@ -41,6 +40,11 @@ app.use((0, express_session_1.default)({ secret: 'thisisasecret', resave: false,
 app.get('/', (req, res) => {
     res.sendFile(path_1.default.join(__dirname, '../public', 'index.html'));
 });
+// Route to serve the publish page
+app.get('/publish', (req, res) => {
+    res.sendFile(path_1.default.join(__dirname, '../public', 'publish.html'));
+});
+// Save image with BigNumber filename
 app.post('/saveImage', (req, res) => {
     try {
         const { image } = req.body;
@@ -49,8 +53,11 @@ app.post('/saveImage', (req, res) => {
         }
         const base64Data = image.replace(/^data:image\/png;base64,/, '');
         const imageData = Buffer.from(base64Data, 'base64');
-        const timestamp = new Date().toISOString().replace(/[-:.]/g, '');
-        const filename = `public/mask/masked_image_${timestamp}.png`;
+        // Generate a BigNumber as the filename
+        const bigNumberFilename = ethers_1.ethers.BigNumber.from(ethers_1.ethers.utils.randomBytes(32)).toString();
+        // Use the BigNumber as the filename
+        console.log(bigNumberFilename);
+        const filename = `public/mask/masked_image_${bigNumberFilename}.png`;
         const savePath = filename;
         fs_1.default.writeFile(savePath, imageData, (err) => {
             if (err) {
@@ -87,8 +94,9 @@ app.post('/recreateImage', (req, res) => __awaiter(void 0, void 0, void 0, funct
         if (!image_url) {
             throw new Error('Failed to get the image URL from the response.');
         }
-        const timestamp = new Date().toISOString().replace(/[-:.]/g, '');
-        const gen_image_filename = `gen_${timestamp}.png`;
+        // Generate a BigNumber as the filename
+        const bigNumberFilename = ethers_1.ethers.BigNumber.from(ethers_1.ethers.utils.randomBytes(32)).toString();
+        const gen_image_filename = `${bigNumberFilename}.png`;
         const gen_image_path = `public/asset/${gen_image_filename}`;
         const imageResponse = yield axios_1.default.get(image_url, { responseType: 'arraybuffer' });
         fs_1.default.writeFileSync(gen_image_path, imageResponse.data);
@@ -135,23 +143,33 @@ app.post('/setSession', (req, res) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
-//mintNFT
+//mint NFT
 app.post('/mintNFT', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { tokenURI, userAddress } = req.body; // Extract tokenURI and userAddress from the request body
-        if (!userAddress || !tokenURI) {
-            return res.status(400).json({ error: 'User address or tokenURI is missing.' });
-        }
-        // Contract interaction setup
+        const { userAddress, customUri } = req.body;
+        // if (!userAddress || !customUri) {
+        //   return res.status(400).json({ error: 'User address or custom URI is missing.' });
+        // }
+        // Initialize the contract without a signer
         const provider = new ethers_1.ethers.providers.JsonRpcProvider(RPCProviderUrl);
-        const signer = provider.getSigner(userAddress); // Get the user's wallet as the signer
-        const contract = new ethers_1.ethers.Contract(NFTContractAddress, MemeNFT_json_1.default.abi, signer); // Create a contract instance with the signer
-        const tx = yield contract.mint(tokenURI, userAddress); // Call the mint function on the contract
-        yield tx.wait(); // Wait for the transaction to be mined
-        res.json({ message: 'NFT minted successfully', transactionHash: tx.hash });
+        const contract = new ethers_1.ethers.Contract(contractAddress, Meme_json_1.default.abi, provider);
+        // Encode the transaction data
+        const txData = contract.interface.encodeFunctionData('mintNFT', [userAddress, customUri]);
+        // Estimate the gas cost for the transaction
+        const gasEstimate = yield contract.estimateGas.mintNFT(userAddress, customUri);
+        // Prepare the transaction data to be sent to the client
+        const tx = {
+            to: contractAddress,
+            from: userAddress,
+            data: txData,
+            gasLimit: ethers_1.ethers.utils.hexlify(gasEstimate),
+            // Optionally, you can add more fields like gasPrice
+        };
+        // Send the transaction data to the client
+        res.status(200).json(tx);
     }
     catch (error) {
-        console.error('Error minting NFT:', error);
+        //console.log('Error preparing transaction:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }));

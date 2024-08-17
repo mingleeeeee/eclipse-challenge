@@ -1,9 +1,12 @@
+let account = null; // Define account globally
 const connectButton = document.getElementById("connectButton");
 const walletID = document.getElementById("walletID");
 const reloadButton = document.getElementById("reloadButton");
 const installAlert = document.getElementById("installAlert");
 const mobileDeviceWarning = document.getElementById("mobileDeviceWarning");
-const IPA_button = document.getElementById('IPA-button');
+//const IPA_button = document.getElementById('IPA-button');
+const mintButton = document.getElementById('mintButton'); // Assuming you have a mint button
+
 const startLoading = () => {
   connectButton.classList.add("loadingButton");
 };
@@ -40,22 +43,14 @@ connectButton.addEventListener("click", () => {
     ethereum
       .request({ method: "eth_requestAccounts" })
       .then((accounts) => {
-        console.log('account info')
-        console.log(window.ethereum)
-        const account = accounts[0];
-        // Display wallet ID
+        account = accounts[0];
         walletID.innerHTML = `Wallet connected: <span>${account}</span>`;
-        IPA_button.style.visibility = 'visible';
-        // Send wallet address to Node.js server
-        //console.log(`address:${account}`)
-        //sendWalletAddressToServer(account);
-        verify()
+        //IPA_button.style.visibility = 'visible';
         stopLoading();
       })
       .catch((error) => {
-        console.log(error, error.code);
-
-        alert(error.code);
+        console.error(error);
+        alert(error.message);
         stopLoading();
       });
   } else {
@@ -66,87 +61,4 @@ connectButton.addEventListener("click", () => {
       installAlert.classList.add("show");
     }
   }
-});
-
-async function verify(){
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  const signer = provider.getSigner();
-  account = await signer.getAddress();
-  const message = 'Signature for minting IP asset on story-protocol';
-  const signature = await signer.signMessage(message);
-
-  const response = await fetch('/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ account:account, message:message, signature:signature })
-  });
-
-  const data = await response.json();
-  console.log(data);
-}
-
-
-// async function sendWalletAddressToServer(walletAddress) {
-//   try {
-//             const response = await fetch('http://localhost:5000/saveWalletAddress', {
-//           method: 'POST',
-//           headers: {
-//               'Content-Type': 'application/json'
-//           },
-//           body: JSON.stringify({ address: walletAddress })
-//       });
-
-//       if (response.ok) {
-//           const responseData = await response.json();
-//           console.log('Server response:', responseData);
-//       } else {
-//           console.error('Server error:', response.statusText);
-//       }
-//   } catch (error) {
-//       console.error('Network error:', error);
-//   }
-// }
-
-async function mintNFT(tokenURI) {
-  if (!account) {
-      alert("Please connect your wallet first.");
-      return;
-  }
-
-  try {
-      // Fetch transaction data from the server
-      const response = await fetch('/mintNFT', {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userAddress: account, tokenURI: tokenURI })
-      });
-
-      const txData = await response.json();
-
-      // Send the transaction using MetaMask
-      const transactionParameters = {
-          to: txData.to,
-          from: txData.from,
-          data: txData.data,
-      };
-
-      const txHash = await ethereum.request({
-          method: 'eth_sendTransaction',
-          params: [transactionParameters],
-      });
-
-      console.log(`Transaction sent with hash: ${txHash}`);
-      alert(`Transaction sent! Hash: ${txHash}`);
-
-  } catch (error) {
-      console.error("Error sending transaction:", error);
-      alert("Failed to send transaction. See console for details.");
-  }
-}
-
-document.getElementById("mintButton").addEventListener("click", function() {
-  const tokenURI = "your_token_uri_here";  // Replace with actual token URI
-  mintNFT(tokenURI);
 });
