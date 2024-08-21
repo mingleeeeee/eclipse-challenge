@@ -1,0 +1,38 @@
+tables:
+  - tableName: user
+    columns:
+      - autoIncrement: false
+        columnName: address
+        defaultCurrentTimeStamp: false
+        fieldName: address
+        hasReference: false
+        length: 255
+        notNull: true
+        onUpdateCurrentTimeStamp: false
+        option:
+          autoIncrementHashId: false
+          updatable: true
+        type: varchar
+        zerofill: false
+      - autoIncrement: false
+        columnName: createdAt
+        default: CURRENT_TIMESTAMP
+        defaultCurrentTimeStamp: true
+        fieldName: createdAt
+        hasReference: false
+        notNull: true
+        onUpdateCurrentTimeStamp: false
+        option:
+          autoIncrementHashId: false
+          updatable: false
+        type: timestamp
+        zerofill: false
+    gqlOption:
+      enabled: false
+      mutations: []
+      queries: []
+    indexes: []
+    primaryKey:
+      - address
+    uniqueKeys: []
+    virtualRelations: []

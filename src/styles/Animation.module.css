@@ -1,0 +1,27 @@
+/* styles/Animation.module.css */
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 400px;
+    position: relative;
+    margin-top: 50px; /* Adjust this value to move the animation down */
+  }
+  
+  .circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: #3498db;
+    position: absolute;
+    animation: move 3s infinite alternate ease-in-out;
+  }
+  
+  @keyframes move {
+    0% {
+      transform: translateY(0);
+    }
+    100% {
+      transform: translateY(-200px);
+    }
+  }

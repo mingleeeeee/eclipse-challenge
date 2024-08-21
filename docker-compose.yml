@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      dockerfile: ./Dockerfile.nextjs
+    container_name: ai-app
+    volumes:
+      - ./:/app
+    ports:
+      - "3400:3000"
+    env_file:
+      - .env
+  db:
+    image: mysql:8.3.0
+    container_name: ai-database
+    environment:
+      # MYSQL_ROOT_PASSWORD: pass
+      MYSQL_USER: user
+      MYSQL_PASSWORD: pass
+      MYSQL_DATABASE: app
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    ports:
+      - "3316:3306"
+  # redis:
+  #   image: "redis:7-alpine"
+  #   ports:
+  #     - "7002:6379"
+# networks:
+#   default:
+#     name: nextjs-test-network
